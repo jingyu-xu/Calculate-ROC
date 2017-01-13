@@ -113,12 +113,12 @@ xlabel('Distance (mm)','FontSize',14); ylabel('Distance (mm)','FontSize',14);
 title('Normal Temperature Profile (\circC)','FontSize',14);
 
 % Generate Anomaly temperatures with tumor radius = 10 mm, tumor depth = 10 mm
-tumor_on = 1; tum_y_cen = 90; tum_z_cen = floor(s3_ss/2);
+tumor_on = 1; tum_y_cen = 90; tum_z_cen = 70;
 
 tumor_radius = 10; tumor_depth = 10; tum_x_cen = 20 + tumor_depth;% tumor dept is 1cm
 [T_3d_abn1,tissue_3d_abn1] = gen_breast_therm_model(model,s1_ss,s2_ss,s3_ss,tumor_on,tumor_depth,tumor_radius,Tambient,Tart,muscle_wall,skin_start,tum_x_cen,tum_y_cen,tum_z_cen);
 
-tumor_radius = 10; tumor_depth = 20; tum_x_cen = 20 + tumor_depth;% tumor dept is 2cm
+tumor_radius = 10; tumor_depth = 30; tum_x_cen = 20 + tumor_depth;% tumor dept is 2cm
 [T_3d_abn2,tissue_3d_abn2] = gen_breast_therm_model(model,s1_ss,s2_ss,s3_ss,tumor_on,tumor_depth,tumor_radius,Tambient,Tart,muscle_wall,skin_start,tum_x_cen,tum_y_cen,tum_z_cen);
 
 figure; 
@@ -135,7 +135,7 @@ contourf(T_3d_abn2(:,:,floor(s3_ss/2)));
 xlabel('Distance (mm)','FontSize',14); ylabel('Distance (mm)','FontSize',14);
 hcb = colorbar; 
 set(hcb,'YTick',[0,1,2,3,4,5,6,7,8],'YTickLabel',{'Air','Skin','Gland-1','Gland-2','Gland-3','Fat-1','Fat-2','Fat-3','Muscle'},'FontSize',14);
-title('Temperature Profile of 2cm Deep Tumor (\circC)','FontSize',14);
+title('Temperature Profile of 3cm Deep Tumor (\circC)','FontSize',14);
 
 for z = 1:s3_ss
     for x = 18:s1_ss
@@ -342,6 +342,79 @@ end
 [Value_1,Index_1] = max(inner_pro_1);
 [Value_2,Index_2] = max(inner_pro_2);
 
+% ROC without Signature
+sd = 0.08;
+T_noise = 0.08*randn(15,100);
+stastic_H0 = zeros(1,100);
+stastic_H1_1 = zeros(1,100);
+stastic_H1_2 = zeros(1,100);
+for i = 1:100
+    stastic_H0(1,i) = (norm(T_noise(:,i)))^2;
+    stastic_H1_1(1,i) = (norm(T_noise(:,i)+TB_delta_1'))^2;
+    stastic_H1_2(1,i) = (norm(T_noise(:,i)+TB_delta_2'))^2;
+end
+tau_1 = linspace(min(min(stastic_H0),min(stastic_H1_1)),max(max(stastic_H0),max(stastic_H1_1)));
+tau_2 = linspace(min(min(stastic_H0),min(stastic_H1_2)),max(max(stastic_H0),max(stastic_H1_2)));
+[r_tau_1, col_tau_1] = size(tau_1);
+[r_tau_2, col_tau_2] = size(tau_2);
+N1 = 0;
+N2 = 0;
+PFA_01 = zeros(1,col_tau_1);
+PDET_01 = zeros(1,col_tau_1);
+for i = 1 : col_tau_1
+    for j = 1:100
+        if stastic_H0(1,j) > tau_1(1,i)
+            N2 = N2+1;
+        end
+    end
+
+    PFA_01(1,i) = N2/100;
+    N2 = 0;
+   
+end
+for i = 1:col_tau_1
+    for j = 1:100
+        if stastic_H1_1(1,j) > tau_1(1,i)
+            N1 = N1 + 1;
+        end
+    end
+    PDET_01(1,i) = N1/100;
+    N1 = 0;
+end
+PFA_02 = zeros(1,col_tau_2);
+PDET_02 = zeros(1,col_tau_2);
+for i = 1 : col_tau_2
+    for j = 1:100
+        if stastic_H0(1,j) > tau_2(1,i)
+            N2 = N2+1;
+        end
+    end
+
+    PFA_02(1,i) = N2/100;
+    N2 = 0;
+   
+end
+for i = 1:col_tau_2
+    for j = 1:100
+        if stastic_H1_2(1,j) > tau_2(1,i)
+            N1 = N1 + 1;
+        end
+    end
+    PDET_02(1,i) = N1/100;
+    N1 = 0;
+end
+
+a = linspace(0,1);
+b = linspace(0,1);
+figure
+plot(PFA_01,PDET_01,'r');hold on;
+plot(PFA_02,PDET_02,'g');hold on;
+plot(a,b); hold off
+xlabel('False Alarm Rate');
+ylabel('Detetion Rate');
+title('ROC for tumor without Signature');
+legend('tumor depth is 1 cm','tumor depth is 3 cm','Location','southeast');
+
 % ROC OF TUMOR AT 1CM
 % alpha to threshold test
 % alpha = (vpa(dot(TB_delta, TBa_total(:,Index)),6))^2/TBa_norm_total(1,Index);
@@ -350,7 +423,6 @@ end
 % TB_delat_H1 = T_noise+c*TBa_hat;
 alpha_H0_1 = zeros(100,1);
 alpha_H1_1 = zeros(100,1);
-T_noise = 0.1*randn(15,100);
 
 TB_delta_H0_1 = T_noise;
 TBa_hat_1 = TBa_total(:,Index_1);
@@ -365,7 +437,7 @@ for i = 1:100
     alpha_H0_1(i,1) = (vpa(dot(TB_delta_H0_1(:,i), TBa_hat_1),6))^2/TBa_hat_norm_1^2;
     alpha_H1_1(i,1) = (vpa(dot(TB_delta_H1_1(:,i), TBa_hat_1),6))^2/TBa_hat_norm_1^2;
 end    
-%t = [3e-8:3e-8:3e-4]; 
+
 t_1 = linspace(min(min(alpha_H0_1),min(alpha_H1_1)),max(max(alpha_H0_1),max(alpha_H1_1)));
 [r_t_1, col_t_1] = size(t_1);
 N1 = 0;
@@ -396,7 +468,6 @@ end
 % ROC of tumor at 2cm 
 alpha_H0_2 = zeros(100,1);
 alpha_H1_2 = zeros(100,1);
-T_noise = 0.1*randn(15,100);
 
 TB_delta_H0_2 = T_noise;
 TBa_hat_2 = TBa_total(:,Index_2);
@@ -445,11 +516,26 @@ plot(PFA_2,PDET_2,'g');hold on;
 plot(a,b); hold off
 xlabel('False Alarm Rate');
 ylabel('Detetion Rate');
-title('ROC for tumor');
-legend('tumor depth is 1 cm','tumor depth is 2 cm','Location','southeast');
+title('ROC for tumor with Signature');
+legend('tumor depth is 1 cm','tumor depth is 3 cm','Location','southeast');
+
+% Compare ROC with signature and without Signature
+figure
+plot(PFA_01,PDET_01,'g--');hold on;
+plot(PFA_1,PDET_1,'r');hold off;
+xlabel('False Alarm Rate');
+ylabel('Detetion Rate');
+title('ROC for tumor depth is 1cm')
+legend('ROC without Singature','ROC with Signature','Location','southeast');
+figure
+plot(PFA_02,PDET_02,'g--');hold on;
+plot(PFA_2,PDET_2,'r');hold off;
+xlabel('False Alarm Rate');
+ylabel('Detetion Rate');
+title('ROC for tumor depth 3cm');
+legend('ROC without Singature','ROC with Signature','Location','southeast');
 
 % Ideal ROC
-sd = 0.1;
 IPFA_1 = (0:0.01:1);
 IPFA_2 = (0:0.01:1);
 Ta_1 = Tvec_abn1 - Tvec_norminal;
@@ -460,20 +546,22 @@ roc_1 = 1-normcdf(norminv(1-IPFA_1)-sqrt(SNR_1));
 roc_2 = 1-normcdf(norminv(1-IPFA_2)-sqrt(SNR_2));
 figure
 plot(IPFA_1,roc_1,'r');hold on
-plot(IPFA_2,roc_2,'g');hold off
+plot(IPFA_2,roc_2,'g--');hold off
 xlabel('False Alarm Rate');
 ylabel('Detetion Rate');
 title('Ideal ROC for tumor');
-legend('tumor depth is 1 cm','tumor depth is 2 cm','Location','southeast');
+legend('tumor depth is 1 cm','tumor depth is 3 cm','Location','southeast');
 
 % Compare Ideal ROC AND NONIdeal ROC
 figure
 plot(IPFA_1,roc_1,'r');hold on
 plot(IPFA_2,roc_2,'g');hold on
-plot(PFA_1,PDET_1,'r');hold on
-plot(PFA_2,PDET_2,'g');hold off
+plot(PFA_1,PDET_1,'r--');hold on
+plot(PFA_2,PDET_2,'g--');hold off
 xlabel('False Alarm Rate');
 ylabel('Detetion Rate');
+
+
 
 
 
