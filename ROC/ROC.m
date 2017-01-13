@@ -142,6 +142,7 @@ for z = 1:s3_ss
         for y = 1:s2_ss
             T_3d_nom(x-17,y,z) = T_3d_nom(x,y,z);
             T_3d_abn1(x-17,y,z) = T_3d_abn1(x,y,z);
+            T_3d_abn2(x-17,y,z) = T_3d_abn2(x,y,z);
             
         end
     end
@@ -151,6 +152,7 @@ model = model(18:end,:,:);
 [s1_ss, s2_ss, s3_ss] = size(model);
 Tvec_norminal = convert_3d_to_1d(T_3d_nom,s1_ss,s2_ss,s3_ss);
 Tvec_abn1 = convert_3d_to_1d(T_3d_abn1,s1_ss,s2_ss,s3_ss);
+Tvec_abn2 = convert_3d_to_1d(T_3d_abn2,s1_ss,s2_ss,s3_ss);
 
 load scat_fib_nom_1ghz_down_new.mat;
 load scat_fib_nom_1ghz_center_new.mat;
@@ -282,9 +284,12 @@ TB_norminal = (WF'*Tvec_norminal)';
 %Tvec_abn1 = convert_3d_to_1d(T_3d_abn1,s1_ss,s2_ss,s3_ss);
 
 TB_abn1 = (WF'*Tvec_abn1)';
+TB_abn2 = (WF'*Tvec_abn2)';
 
 % Calculate TB_delta
-TB_delta = TB_abn1-TB_norminal;
+TB_delta_1 = TB_abn1-TB_norminal;
+TB_delta_2 = TB_abn2-TB_norminal;
+
 [r_wf, col_wf] = size(WF);
 [r_A_norminal, col_A_norminal] = size(A_norminal);
 S_norminal = zeros(r_A_norminal, col_wf);
@@ -292,7 +297,7 @@ for i = 1:15
     S_norminal(:,i) = cgs(A_norminal',WF(:,i));
 end
 S_norminal = S_norminal';
-% Generate 990 columns Index Vectors
+% Generate dictionary of tumor position
 diameter = 20;
 k=1;
 i = 1;
@@ -323,83 +328,125 @@ for i = 1:r_tum_pos
     S_reduce = sum(S_reduce,2);
     TBa = S_reduce;
     TBa_norm = norm(TBa);
-    %S_reduce_norm = norm(S_reduce);
-    %TBa = S_reduce./S_reduce_norm;
-    %S_reduce_total(:,i) = S_reduce;
     TBa_total(:,i) = TBa;
-    %S_reduce_norm_total(i,1) = S_reduce_norm;
     TBa_norm_total(:,i) = TBa_norm;
 end
-inner_pro = zeros(r_tum_pos,1);
+inner_pro_1 = zeros(r_tum_pos,1);
+inner_pro_2 = zeros(r_tum_pos,1);
 
 
 for i = 1:r_tum_pos
-    inner_pro(i,1) = vpa(dot(TB_delta,TBa_total(:,i)),6)/TBa_norm_total(:,i);
-    
+    inner_pro_1(i,1) = vpa(dot(TB_delta_1,TBa_total(:,i)),6)/TBa_norm_total(:,i);
+    inner_pro_2(i,1) = vpa(dot(TB_delta_2,TBa_total(:,i)),6)/TBa_norm_total(:,i);
 end
-[Value,Index] = max(inner_pro);
+[Value_1,Index_1] = max(inner_pro_1);
+[Value_2,Index_2] = max(inner_pro_2);
 
+% ROC OF TUMOR AT 1CM
 % alpha to threshold test
 % alpha = (vpa(dot(TB_delta, TBa_total(:,Index)),6))^2/TBa_norm_total(1,Index);
 % plot ROC without tumor, 100 times
 % TB_delta_H0 = T_noise;
 % TB_delat_H1 = T_noise+c*TBa_hat;
-alpha_H0 = zeros(100,1);
-alpha_H1 = zeros(100,1);
-T_noise = 0.05*randn(15,100);
+alpha_H0_1 = zeros(100,1);
+alpha_H1_1 = zeros(100,1);
+T_noise = 0.1*randn(15,100);
 
-TB_delta_H0 = T_noise;
-TBa_hat = TBa_total(:,Index);
-TBa_hat_norm =norm(TBa_hat);
-const = dot(TB_delta, TBa_hat)/TBa_hat_norm^2;
-TB_delta_H1 = zeros(15,100);
+TB_delta_H0_1 = T_noise;
+TBa_hat_1 = TBa_total(:,Index_1);
+TBa_hat_norm_1 =norm(TBa_hat_1);
+const_1 = dot(TB_delta_1, TBa_hat_1)/TBa_hat_norm_1^2;
+TB_delta_H1_1 = zeros(15,100);
 for i = 1:100
-    TB_delta_H1(:,i) = T_noise(:,i) + const*TBa_hat;
+    TB_delta_H1_1(:,i) = T_noise(:,i) + const_1*TBa_hat_1;
 end
 
 for i = 1:100
-    alpha_H0(i,1) = (vpa(dot(TB_delta_H0(:,i), TBa_hat),6))^2/TBa_hat_norm^2;
-    alpha_H1(i,1) = (vpa(dot(TB_delta_H1(:,i), TBa_hat),6))^2/TBa_hat_norm^2;
+    alpha_H0_1(i,1) = (vpa(dot(TB_delta_H0_1(:,i), TBa_hat_1),6))^2/TBa_hat_norm_1^2;
+    alpha_H1_1(i,1) = (vpa(dot(TB_delta_H1_1(:,i), TBa_hat_1),6))^2/TBa_hat_norm_1^2;
 end    
 %t = [3e-8:3e-8:3e-4]; 
-t = linspace(min(min(alpha_H0),min(alpha_H1)),max(max(alpha_H0),max(alpha_H1)));
-[r_t, col_t] = size(t);
+t_1 = linspace(min(min(alpha_H0_1),min(alpha_H1_1)),max(max(alpha_H0_1),max(alpha_H1_1)));
+[r_t_1, col_t_1] = size(t_1);
 N1 = 0;
 N2 = 0;
-PFA = zeros(1,col_t);
-PDET = zeros(1,col_t);
-for i = 1 : col_t
+PFA_1 = zeros(1,col_t_1);
+PDET_1 = zeros(1,col_t_1);
+for i = 1 : col_t_1
     for j = 1:100
-        if alpha_H0(j,1) > t(1,i)
+        if alpha_H0_1(j,1) > t_1(1,i)
             N2 = N2+1;
         end
     end
 
-    PFA(1,i) = N2/100;
+    PFA_1(1,i) = N2/100;
     N2 = 0;
    
 end
-for i = 1:col_t
+for i = 1:col_t_1
     for j = 1:100
-        if alpha_H1(j,1) > t(1,i)
+        if alpha_H1_1(j,1) > t_1(1,i)
             N1 = N1 + 1;
         end
     end
-    PDET(1,i) = N1/100;
+    PDET_1(1,i) = N1/100;
     N1 = 0;
 end
+
+% ROC of tumor at 2cm 
+alpha_H0_2 = zeros(100,1);
+alpha_H1_2 = zeros(100,1);
+T_noise = 0.1*randn(15,100);
+
+TB_delta_H0_2 = T_noise;
+TBa_hat_2 = TBa_total(:,Index_2);
+TBa_hat_norm_2 =norm(TBa_hat_2);
+const_2 = dot(TB_delta_2, TBa_hat_2)/TBa_hat_norm_2^2;
+TB_delta_H1_2 = zeros(15,100);
+for i = 1:100
+    TB_delta_H1_2(:,i) = T_noise(:,i) + const_2*TBa_hat_2;
+end
+
+for i = 1:100
+    alpha_H0_2(i,1) = (vpa(dot(TB_delta_H0_2(:,i), TBa_hat_2),6))^2/TBa_hat_norm_2^2;
+    alpha_H1_2(i,1) = (vpa(dot(TB_delta_H1_2(:,i), TBa_hat_2),6))^2/TBa_hat_norm_2^2;
+end    
+t_2 = linspace(min(min(alpha_H0_2),min(alpha_H1_2)),max(max(alpha_H0_2),max(alpha_H1_2)));
+[r_t_2, col_t_2] = size(t_2);
+N1 = 0;
+N2 = 0;
+PFA_2 = zeros(1,col_t_2);
+PDET_2 = zeros(1,col_t_2);
+for i = 1 : col_t_2
+    for j = 1:100
+        if alpha_H0_2(j,1) > t_2(1,i)
+            N2 = N2+1;
+        end
+    end
+
+    PFA_2(1,i) = N2/100;
+    N2 = 0;
    
-            
-%a = linspace(0,1);
-%b = linspace(0,1);
-%figure
-plot(PFA,PDET,'r');
-%plot(a,b);
+end
+for i = 1:col_t_2
+    for j = 1:100
+        if alpha_H1_2(j,1) > t_2(1,i)
+            N1 = N1 + 1;
+        end
+    end
+    PDET_2(1,i) = N1/100;
+    N1 = 0;
+end
+a = linspace(0,1);
+b = linspace(0,1);
+figure
+plot(PFA_1,PDET_1,'g');hold on;
+plot(PFA_2,PDET_2,'r');hold on;
+plot(a,b); hold off
 xlabel('False Alarm Rate');
 ylabel('Detetion Rate');
-% GLR THRESHOLD TEST
-
-
+title('ROC for tumor');
+legend('tumor depth is 1 cm','tumor depth is 2 cm','Location','southeast');
 
 
    
