@@ -440,13 +440,43 @@ end
 a = linspace(0,1);
 b = linspace(0,1);
 figure
-plot(PFA_1,PDET_1,'g');hold on;
-plot(PFA_2,PDET_2,'r');hold on;
+plot(PFA_1,PDET_1,'r');hold on;
+plot(PFA_2,PDET_2,'g');hold on;
 plot(a,b); hold off
 xlabel('False Alarm Rate');
 ylabel('Detetion Rate');
 title('ROC for tumor');
 legend('tumor depth is 1 cm','tumor depth is 2 cm','Location','southeast');
+
+% Ideal ROC
+sd = 0.1;
+IPFA_1 = (0:0.01:1);
+IPFA_2 = (0:0.01:1);
+Ta_1 = Tvec_abn1 - Tvec_norminal;
+Ta_2 = Tvec_abn2 - Tvec_norminal;
+SNR_1 = (norm(WF'*Ta_1))^2/sd^2;
+SNR_2 = (norm(WF'*Ta_2))^2/sd^2;
+roc_1 = 1-normcdf(norminv(1-IPFA_1)-sqrt(SNR_1));
+roc_2 = 1-normcdf(norminv(1-IPFA_2)-sqrt(SNR_2));
+figure
+plot(IPFA_1,roc_1,'r');hold on
+plot(IPFA_2,roc_2,'g');hold off
+xlabel('False Alarm Rate');
+ylabel('Detetion Rate');
+title('Ideal ROC for tumor');
+legend('tumor depth is 1 cm','tumor depth is 2 cm','Location','southeast');
+
+% Compare Ideal ROC AND NONIdeal ROC
+figure
+plot(IPFA_1,roc_1,'r');hold on
+plot(IPFA_2,roc_2,'g');hold on
+plot(PFA_1,PDET_1,'r');hold on
+plot(PFA_2,PDET_2,'g');hold off
+xlabel('False Alarm Rate');
+ylabel('Detetion Rate');
+
+
+
 
 
    
